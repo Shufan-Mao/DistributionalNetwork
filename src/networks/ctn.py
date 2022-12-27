@@ -22,8 +22,9 @@ class CTN(NetworkBaseClass):
                  params: CTNParams,
                  token2id: Dict[str, int],
                  seq_parsed: List[Tuple],
+                 decay: float
                  ):
-        NetworkBaseClass.__init__(self)
+        NetworkBaseClass.__init__(self, decay)
 
         self.params = params
         self.token2id = token2id
@@ -277,18 +278,23 @@ class CTN(NetworkBaseClass):
 
         return similarity_matrix
 
-    def calc_sr_scores(self, verb, theme, instruments):
+    def calc_sr_scores(self, verb, theme, instruments, step_bound = None):
 
         print(f'Computing relatedness between {verb + WS + theme:>22} and instruments...', flush=True)
 
-        if (verb, theme) in self.node_list:
-            sr_verb = self.activation_spreading_analysis(verb, self.node_list,
-                                                         excluded_edges=[((verb, theme), theme)])
-            sr_theme = self.activation_spreading_analysis(theme, self.node_list,
-                                                          excluded_edges=[((verb, theme), verb)])
-        else:
-            sr_verb = self.activation_spreading_analysis(verb, self.node_list, excluded_edges=[])
-            sr_theme = self.activation_spreading_analysis(theme, self.node_list, excluded_edges=[])
+        if step_bound: # consider recurrent activation with spreading decay
+            sr_verb = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+            sr_theme = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+
+        else: # non-recurrent activation of limited steps
+            if (verb, theme) in self.node_list:
+                sr_verb = self.non_recurrent_relatedness(verb, self.node_list,
+                                                             excluded_edges=[((verb, theme), theme)])
+                sr_theme = self.non_recurrent_relatedness(theme, self.node_list,
+                                                              excluded_edges=[((verb, theme), verb)])
+            else:
+                sr_verb = self.non_recurrent_relatedness(verb, self.node_list, excluded_edges=[])
+                sr_theme = self.non_recurrent_relatedness(theme, self.node_list, excluded_edges=[])
 
         scores = []
         for instrument in instruments:

@@ -17,8 +17,9 @@ class LON(NetworkBaseClass):
     def __init__(self,
                  params: LONParams,
                  seq_tok: List[List[str]],
+                 decay: float
                  ):
-        NetworkBaseClass.__init__(self)
+        NetworkBaseClass.__init__(self, decay)
 
         self.params = params
         self.seq_tok = seq_tok
@@ -67,13 +68,20 @@ class LON(NetworkBaseClass):
         self.network = nx.Graph()
         self.network.add_weighted_edges_from(weighted_network_edge)
 
-    def calc_sr_scores(self, verb, theme, instruments):
+    def calc_sr_scores(self, verb, theme, instruments, step_bound=None):
         """compute sr scores for a single row in the blank sr data frame."""
 
-        if verb not in self.sr_bank:
-            self.sr_bank[verb] = self.activation_spreading_analysis(verb, instruments, [])
-        if theme not in self.sr_bank:
-            self.sr_bank[theme] = self.activation_spreading_analysis(theme, instruments, [])
+        if step_bound:  # consider recurrent activation with spreading decay
+            if verb not in self.sr_bank:
+                self.sr_bank[verb] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+            if theme not in self.sr_bank:
+                self.sr_bank[theme] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+
+        else:  # non-recurrent activation of limited steps
+            if verb not in self.sr_bank:
+                self.sr_bank[verb] = self.non_recurrent_relatedness(verb, instruments, [])
+            if theme not in self.sr_bank:
+                self.sr_bank[theme] = self.non_recurrent_relatedness(theme, instruments, [])
 
         scores = []
         for instrument in instruments:  # instrument columns start after the 3rd column

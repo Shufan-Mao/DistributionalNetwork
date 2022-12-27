@@ -1,5 +1,6 @@
 import networkx as nx
 import numpy as np
+from numpy.linalg import matrix_power
 from scipy.sparse import lil_matrix
 from typing import List, Dict
 from cached_property import cached_property
@@ -12,10 +13,11 @@ class NetworkBaseClass:
     abstract class inherited by CTN (constituent-tree network) and LON (liner-order network)
     """
 
-    def __init__(self):
+    def __init__(self, decay):
         self.network = None
         self.node_list = []
-
+        self.decay = decay # activation decayed along the path
+        self.accumulated_activation_list = []
         self.path_distance_dict = {node: {} for node in self.node_list}
         # keys are nodes, values are distances from the key node to all other nodes in the graph.
 
@@ -32,6 +34,7 @@ class NetworkBaseClass:
     @cached_property
     def diameter(self):
         return nx.algorithms.distance_measures.diameter(self.undirected_network)
+
 
     def get_sized_neighbor_node(self, graph, node, size):
         """
@@ -79,13 +82,34 @@ class NetworkBaseClass:
 
         return adj_mat
 
-    def activation_spreading_analysis(self,
+    def get_accumulated_activations(self):
+        d = self.diameter
+
+        step_activation = self.decay * self.adjacency_matrix
+        activation_diffusion = np.identity(self.adjacency_matrix.shape[0])
+        sum_activation = np.identity(self.adjacency_matrix.shape[0])
+
+        for i in range(d):
+            activation_diffusion = activation_diffusion @ step_activation
+            sum_activation = sum_activation + activation_diffusion
+            self.accumulated_activation_list.append(sum_activation)
+
+
+
+
+
+
+
+    # non-recurrent spreading-activation sr
+
+    def non_recurrent_relatedness(self,
                                       source: str,
                                       targets: List[str],
                                       excluded_edges,  # a list of directed edges (e.g.(a,b)) that are excluded
                                       ) -> Dict[str, float]:
         """
-        a spreading-activation measure of the "semantic relatedness" (sr) from source to targets.
+        a spreading-activation measure of the "semantic relatedness" (sr) from source to targets， defined as the
+        non-recurrent activation from the source to the target within a certain range of discrete steps
         return a sr_dictionary consisting of sr from the source to all targets
         """
 
@@ -134,6 +158,31 @@ class NetworkBaseClass:
             semantic_relatedness_dict[word] = activation_recorder[0, self.node_list.index(word)]
 
         return semantic_relatedness_dict
+
+    # general (recurrent) spreading-activation sr
+
+    def recurrent_spreading_relatedness(self,
+                                      source: str,
+                                      targets: List[str],
+                                      step_bound: int,
+                                      excluded_edges,  # a list of directed edges (e.g.(a,b)) that are excluded
+                                      ) -> Dict[str, float]:
+        #print(self.accumulated_activation_list[0].sum())
+
+        semantic_relatedness_dict = {}
+        step_limit = min(step_bound, self.diameter)
+        relatedness_mat = self.accumulated_activation_list[step_limit-1]
+
+
+        for word in targets:
+            semantic_relatedness_dict[word] = relatedness_mat[self.node_list.index(source), self.node_list.index(word)]
+
+
+
+        return semantic_relatedness_dict
+
+
+
 
     def get_path_distance(self, source, source_activation, visited):  # TODO is this needed?
         """

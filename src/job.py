@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import List, Tuple
 import pandas as pd
 import random
+import numpy as np
 
 from missingadjunct.corpus import Corpus
 from missingadjunct.utils import make_blank_sr_df
@@ -15,7 +16,22 @@ from src.other_dsms.transformer import Transformer
 from src.networks.ctn import CTN
 from src.networks.lon import LON
 
-p2val = {'dsm':'ctn','save_path':'result.csv'}
+p2val = {'dsm':'ctn',
+         'save_path':'Data',
+         'excluded_tokens':None,
+         'include_location':False,
+        'include_location_specific_agents':False,
+        'num_blocks':400,
+        'complete_block':True,
+        'add_with':True,
+        'add_in':True,
+        'strict_compositional':False,
+        'add_reversed_seq':False,
+        'composition_fn': 'native'
+
+         }
+decay = 0.75
+step_bound = None # non-recurrent activation if None, recurrent activation with bound if certain number
 
 
 def main(param2val):
@@ -47,6 +63,7 @@ def main(param2val):
 
     # load blank df for evaluating sr scores
     df_blank = make_blank_sr_df()
+    df_blank.insert(loc=3, column='location-type', value=['' for i in range(df_blank.shape[0])])
     df_results = df_blank.copy()
     instruments = df_blank.columns[4:]  # instrument columns start after the 4th column
     if not set(instruments).issubset(corpus.vocab):
@@ -82,15 +99,20 @@ def main(param2val):
     elif params.dsm == 'transformer':
         dsm = Transformer(params.dsm_params, token2id, seq_num, df_blank, instruments, save_path, eos)
     elif params.dsm == 'ctn':
-        dsm = CTN(params.dsm_params, token2id, seq_parsed)
+        dsm = CTN(params.dsm_params, token2id, seq_parsed, decay)
+
     elif params.dsm == 'lon':
-        dsm = LON(params.dsm_params, seq_tok)  # TODO the net is built directly from corpus rather than co-occ
+        dsm = LON(params.dsm_params, seq_tok, decay)  # TODO the net is built directly from corpus rather than co-occ
     else:
         raise NotImplementedError
+
 
     # train
     dsm.train()
     print(f'Completed training the DSM', flush=True)
+
+    if params.dsm == 'ctn' or params.dsm == 'lon':
+        dsm.get_accumulated_activations()
 
     # fill in blank data frame with semantic-relatedness scores
     for verb_phrase, row in df_blank.iterrows():
@@ -98,7 +120,7 @@ def main(param2val):
 
         # score graphical models
         if isinstance(dsm, LON) or isinstance(dsm, CTN):
-            scores = dsm.calc_sr_scores(verb, theme, instruments)
+            scores = dsm.calc_sr_scores(verb, theme, instruments, step_bound)
 
         # score spatial models
         else:
