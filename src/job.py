@@ -6,15 +6,16 @@ import random
 from missingadjunct.corpus import Corpus
 from missingadjunct.utils import make_blank_sr_df
 
-from traindsms.utils import calc_sr_cores_from_spatial_model
+from src.utils import calc_sr_cores_from_spatial_model
 from src.params import Params
-from src.dsms.count import CountDSM
-from src.dsms.random_control import RandomControlDSM
-from src.dsms.w2vec import W2Vec
-from src.dsms.rnn import RNN
-from src.dsms.transformer import Transformer
-from src.dsms.ctn import CTN
-from src.dsms.lon import LON
+from src.other_dsms.count import CountDSM
+from src.other_dsms.w2vec import W2Vec
+from src.other_dsms.rnn import RNN
+from src.other_dsms.transformer import Transformer
+from src.networks.ctn import CTN
+from src.networks.lon import LON
+
+p2val = {'dsm':'ctn','save_path':'result.csv'}
 
 
 def main(param2val):
@@ -32,14 +33,16 @@ def main(param2val):
     if not save_path.exists():
         save_path.mkdir(parents=True)
 
+    # TODO: in newer version of MissingAdjunct, Corpus class has more arguments
+
     corpus = Corpus(include_location=params.corpus_params.include_location,
                     include_location_specific_agents=params.corpus_params.include_location_specific_agents,
                     num_epochs=params.corpus_params.num_blocks,
-                    complete_epoch=params.corpus_params.complete_block,
+                    #complete_epoch=params.corpus_params.complete_block,
                     seed=random.randint(0, 1000),
-                    add_with=params.corpus_params.add_with,
-                    add_in=params.corpus_params.add_in,
-                    strict_compositional=params.corpus_params.strict_compositional,
+                    #add_with=params.corpus_params.add_with,
+                    #add_in=params.corpus_params.add_in,
+                    #strict_compositional=params.corpus_params.strict_compositional,
                     )
 
     # load blank df for evaluating sr scores
@@ -53,12 +56,17 @@ def main(param2val):
     seq_num: List[List[int]] = []  # sequences of Ids
     seq_tok: List[List[str]] = []  # sequences of tokens
     seq_parsed: List[Tuple] = []  # sequences that are constituent-parsed
+
+    # TODO: in newer version of MissingAdjunct, token2id, eos are attributes of the Corpus class
+    token2id = {t: n for n, t in enumerate(corpus.vocab)}
+    eos = '<eos>'
+
     for s in corpus.get_sentences():  # a sentence is a string
         tokens = s.split()
-        seq_num.append([corpus.token2id[token] for token in tokens])  # numeric (token IDs)
+        seq_num.append([token2id[token] for token in tokens])  # numeric (token IDs)
         seq_tok.append(tokens)  # raw tokens
         if params.corpus_params.add_reversed_seq:
-            seq_num.append([corpus.token2id[token] for token in tokens][::-1])
+            seq_num.append([token2id[token] for token in tokens][::-1])
             seq_tok.append(tokens[::-1])
     for tree in corpus.get_trees():
         seq_parsed.append(tree)
@@ -67,16 +75,14 @@ def main(param2val):
 
     if params.dsm == 'count':
         dsm = CountDSM(params.dsm_params, corpus.vocab, seq_num)
-    elif params.dsm == 'random':
-        dsm = RandomControlDSM(params.dsm_params, corpus.vocab)
     elif params.dsm == 'w2v':
         dsm = W2Vec(params.dsm_params, corpus.vocab, seq_tok)
     elif params.dsm == 'rnn':
-        dsm = RNN(params.dsm_params, corpus.token2id, seq_num, df_blank, instruments, save_path)
+        dsm = RNN(params.dsm_params, token2id, seq_num, df_blank, instruments, save_path)
     elif params.dsm == 'transformer':
-        dsm = Transformer(params.dsm_params, corpus.token2id, seq_num, df_blank, instruments, save_path, corpus.eos)
+        dsm = Transformer(params.dsm_params, token2id, seq_num, df_blank, instruments, save_path, eos)
     elif params.dsm == 'ctn':
-        dsm = CTN(params.dsm_params, corpus.token2id, seq_parsed)
+        dsm = CTN(params.dsm_params, token2id, seq_parsed)
     elif params.dsm == 'lon':
         dsm = LON(params.dsm_params, seq_tok)  # TODO the net is built directly from corpus rather than co-occ
     else:
@@ -127,3 +133,5 @@ def main(param2val):
     print('Completed main.job.', flush=True)
 
     return series_list
+
+main(p2val)
