@@ -7,7 +7,7 @@ import numpy as np
 from missingadjunct.corpus import Corpus
 from missingadjunct.utils import make_blank_sr_df
 
-from src.utils import calc_sr_cores_from_spatial_model
+
 from src.params import Params
 from src.other_dsms.count import CountDSM
 from src.other_dsms.w2vec import W2Vec
@@ -16,7 +16,9 @@ from src.other_dsms.transformer import Transformer
 from src.networks.ctn import CTN
 from src.networks.lon import LON
 
-p2val = {'dsm':'ctn',
+from src.tasks import select_instrument, predict_next_word
+
+p2val = {'dsm':'lon',
          'save_path':'Data',
          'excluded_tokens':None,
          'include_location':False,
@@ -64,7 +66,6 @@ def main(param2val):
     # load blank df for evaluating sr scores
     df_blank = make_blank_sr_df()
     df_blank.insert(loc=3, column='location-type', value=['' for i in range(df_blank.shape[0])])
-    df_results = df_blank.copy()
     instruments = df_blank.columns[4:]  # instrument columns start after the 4th column
     if not set(instruments).issubset(corpus.vocab):
         raise RuntimeError('Not all instruments in corpus. Add more blocks or set complete_block=True')
@@ -107,36 +108,28 @@ def main(param2val):
         raise NotImplementedError
 
 
-    # train
+    # Train distributional models
     dsm.train()
     print(f'Completed training the DSM', flush=True)
 
     if params.dsm == 'ctn' or params.dsm == 'lon':
         dsm.get_accumulated_activations()
 
-    # fill in blank data frame with semantic-relatedness scores
-    for verb_phrase, row in df_blank.iterrows():
-        verb, theme = verb_phrase.split()
+    ####################################################################################################################
+    #Tasks
+    ####################################################################################################################
 
-        # score graphical models
-        if isinstance(dsm, LON) or isinstance(dsm, CTN):
-            scores = dsm.calc_sr_scores(verb, theme, instruments, step_bound)
 
-        # score spatial models
-        else:
-            if params.composition_fn == 'native':  # use next-word prediction to compute sr scores
-                scores = dsm.calc_native_sr_scores(verb, theme, instruments)
-            else:
-                scores = calc_sr_cores_from_spatial_model(dsm, verb, theme, instruments, params.composition_fn)
+    # verb phrase select instrument
+    #select_instrument(df_blank, dsm, instruments, params, step_bound, save_path)
 
-        # collect sr scores in new df
-        df_results.loc[verb_phrase] = [row['verb-type'],
-                                       row['theme-type'],
-                                       row['phrase-type'],
-                                       row['location-type']
-                                       ] + scores
+    # predicting next word
+    predict_next_word(dsm, seq_tok, step_bound)
 
-    df_results.to_csv(save_path / 'df_sr.csv')
+
+    ####################################################################################################################
+    ####################################################################################################################
+
 
     # prepare collected data for returning to Ludwig
     performance = dsm.get_performance()

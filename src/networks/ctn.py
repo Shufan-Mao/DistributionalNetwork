@@ -283,8 +283,8 @@ class CTN(NetworkBaseClass):
         print(f'Computing relatedness between {verb + WS + theme:>22} and instruments...', flush=True)
 
         if step_bound: # consider recurrent activation with spreading decay
-            sr_verb = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
-            sr_theme = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+            sr_verb = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound)
+            sr_theme = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound)
 
         else: # non-recurrent activation of limited steps
             if (verb, theme) in self.node_list:

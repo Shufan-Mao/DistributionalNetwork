@@ -1,6 +1,6 @@
 import networkx as nx
 import numpy as np
-from numpy.linalg import matrix_power
+import math
 from scipy.sparse import lil_matrix
 from typing import List, Dict
 from cached_property import cached_property
@@ -83,7 +83,7 @@ class NetworkBaseClass:
         return adj_mat
 
     def get_accumulated_activations(self):
-        d = self.diameter
+        d = self.diameter + 2
 
         step_activation = self.decay * self.adjacency_matrix
         activation_diffusion = np.identity(self.adjacency_matrix.shape[0])
@@ -93,11 +93,6 @@ class NetworkBaseClass:
             activation_diffusion = activation_diffusion @ step_activation
             sum_activation = sum_activation + activation_diffusion
             self.accumulated_activation_list.append(sum_activation)
-
-
-
-
-
 
 
     # non-recurrent spreading-activation sr
@@ -165,12 +160,11 @@ class NetworkBaseClass:
                                       source: str,
                                       targets: List[str],
                                       step_bound: int,
-                                      excluded_edges,  # a list of directed edges (e.g.(a,b)) that are excluded
                                       ) -> Dict[str, float]:
         #print(self.accumulated_activation_list[0].sum())
 
         semantic_relatedness_dict = {}
-        step_limit = min(step_bound, self.diameter)
+        step_limit = min(step_bound, self.diameter + 2)
         relatedness_mat = self.accumulated_activation_list[step_limit-1]
 
 
@@ -180,6 +174,34 @@ class NetworkBaseClass:
 
 
         return semantic_relatedness_dict
+
+
+    # compute the accumulated activation on (the nodes of) the network, given a set of inputs (nodes with initial activation)
+    def spreading_activation(self,
+                             input: List[str],
+                             step_bound
+                             ) -> Dict[str, float]:
+        spreading_activation_dict = {}
+
+        spreading_activation = np.zeros((len(input), len(self.node_list)))
+        for i in range(len(input)):
+            word = input[i]
+            if step_bound:
+                word_activation_dict = self.recurrent_spreading_relatedness(word, self.node_list, step_bound)
+            else:
+                word_activation_dict = self.non_recurrent_relatedness(word, self.node_list, excluded_edges=[])
+            for j in range(len(self.node_list)):
+                spreading_activation[i][j] = math.log(word_activation_dict[self.node_list[j]])
+
+        spreading_activation = spreading_activation.sum(0)/len(input)
+
+        for j in range(len(self.node_list)):
+            target = self.node_list[j]
+            spreading_activation_dict[target] = spreading_activation[j]
+
+        sorted_activation = {k:v for k, v in sorted(spreading_activation_dict.items(), key=lambda item: item[1],
+                                                    reverse=True)}
+        return  sorted_activation
 
 
 

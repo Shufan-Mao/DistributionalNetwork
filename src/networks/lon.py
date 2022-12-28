@@ -73,9 +73,9 @@ class LON(NetworkBaseClass):
 
         if step_bound:  # consider recurrent activation with spreading decay
             if verb not in self.sr_bank:
-                self.sr_bank[verb] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+                self.sr_bank[verb] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound)
             if theme not in self.sr_bank:
-                self.sr_bank[theme] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound, excluded_edges=[])
+                self.sr_bank[theme] = self.recurrent_spreading_relatedness(verb, self.node_list, step_bound)
 
         else:  # non-recurrent activation of limited steps
             if verb not in self.sr_bank:
