@@ -103,7 +103,7 @@ class CTN(NetworkBaseClass):
 
         weighted_network_edge = []
         for edge in network_edge_dict:
-            weighted_network_edge.append(edge + (math.log10(network_edge_dict[edge]+1),))
+            weighted_network_edge.append(edge + (network_edge_dict[edge],))
 
         if VERBOSE:
             print()

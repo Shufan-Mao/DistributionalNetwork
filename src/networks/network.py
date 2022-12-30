@@ -69,21 +69,28 @@ class NetworkBaseClass:
         adj_mat = nx.adjacency_matrix(self.network, nodelist=self.node_list)
         adj_mat.todense()
         length = adj_mat.shape[0]
+
         adj_mat = adj_mat + np.transpose(adj_mat)
-        adj_mat = lil_matrix(adj_mat)
+
+        adj_mat = lil_matrix(adj_mat, dtype = float)
 
         normalizer = adj_mat.sum(1)
         for i in range(length):
-            for j in range(length):
-                if normalizer[i][0, 0] == 0:
-                    adj_mat[i, j] = 0
-                else:
+            if normalizer[i][0, 0] == 0:
+                adj_mat[i, ] = 0
+            else:
+                for j in range(length):
                     adj_mat[i, j] = adj_mat[i, j] / normalizer[i][0, 0]
+
+
 
         return adj_mat
 
-    def get_accumulated_activations(self):
-        d = self.diameter + 2
+    def get_accumulated_activations(self, step_bound):
+        if step_bound:
+            d = self.diameter + step_bound
+        else:
+            d = self.diameter
 
         step_activation = self.decay * self.adjacency_matrix
         activation_diffusion = np.identity(self.adjacency_matrix.shape[0])
@@ -111,6 +118,7 @@ class NetworkBaseClass:
         adj_mat = self.adjacency_matrix.copy()
         length = adj_mat.shape[0]
 
+
         activation = np.zeros((1, length), float)
         fired = np.ones((1, length), float)
         activation[0, self.node_list.index(source)] = 1  # source is activated
@@ -123,10 +131,14 @@ class NetworkBaseClass:
         activation_recorder = activation
         last_fired = np.zeros((1, length), float)
 
+
+
         while fired.any() or last_fired.any():
             activation = activation * adj_mat
             activation_recorder = activation_recorder + np.multiply(fired, activation) + \
                                   np.multiply(last_fired,activation)
+
+
             # record the first time arrived
             # activation, which stands for the semantic relatedness from the source to the activated node
             last_fired = np.zeros((1,length),float)
@@ -164,7 +176,7 @@ class NetworkBaseClass:
         #print(self.accumulated_activation_list[0].sum())
 
         semantic_relatedness_dict = {}
-        step_limit = min(step_bound, self.diameter + 2)
+        step_limit = self.diameter + step_bound
         relatedness_mat = self.accumulated_activation_list[step_limit-1]
 
 

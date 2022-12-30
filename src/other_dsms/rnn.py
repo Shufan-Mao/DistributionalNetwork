@@ -10,7 +10,7 @@ import random
 import torch
 import yaml
 
-from missingadjunct.corpus import Corpus
+from src.MissingAdjunct.missingadjunct.corpus import Corpus
 
 from src.params import RNNParams, Params
 

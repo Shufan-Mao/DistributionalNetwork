@@ -18,7 +18,7 @@ from src.networks.ctn import CTN
 from src.networks.lon import LON
 
 
-
+# verb phrase select instrument
 
 
 def select_instrument(df_blank, dsm, instruments, params, step_bound, save_path):
@@ -49,6 +49,8 @@ def select_instrument(df_blank, dsm, instruments, params, step_bound, save_path)
 
     df_results.to_csv(save_path / 'df_sr.csv')
 
+# predicting the next word
+
 def predict_next_word(dsm, seq_tok, step_bound):
     seq_set = []
     for seq in seq_tok:
@@ -59,14 +61,26 @@ def predict_next_word(dsm, seq_tok, step_bound):
 
     if isinstance(dsm, LON) or isinstance(dsm, CTN):
         for seq in seq_set:
-            sorted_activation = dsm.spreading_activation(seq[:-1], step_bound)
+            sorted_activation = dsm.spreading_activation(seq[:-2], step_bound)
             rank = [k for k,v in sorted_activation.items()]
-            print(seq, rank)
-            if rank[0] == seq[-1]:
+            filtered_rank = []
+            filtered_activation = {}
+
+            for node in rank:
+                if isinstance(node, str) and node not in seq[:-2]:
+                    filtered_rank.append(node)
+                    filtered_activation[node] = sorted_activation[node]
+            if 'preserve' in seq:
+                print(seq[:-1], filtered_activation)
+            if rank[0] == seq[-2]:
                 hit = hit + 1
         hit = hit/len(seq_set)
 
     print(hit)
+
+
+
+
 
 
 
